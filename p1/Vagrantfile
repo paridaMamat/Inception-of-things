@@ -1,0 +1,56 @@
+require "securerandom"
+require "fileutils"
+
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "generic/ubuntu2204"
+
+  # Generate the cluster token once and keep it locally.
+  token_dir = File.join(__dir__, ".vagrant")
+  token_file = File.join(token_dir, "k3s_token")
+
+  FileUtils.mkdir_p(token_dir)
+
+  unless File.exist?(token_file)
+    File.write(token_file, SecureRandom.hex(32))
+  end
+
+  k3s_token = File.read(token_file).strip
+
+  config.vm.define "pmaimaitS" do |server|
+    server.vm.hostname = "pmaimaitS"
+
+    server.vm.network "private_network",
+      ip: "192.168.56.110"
+
+    server.vm.provider "libvirt" do |lv|
+      lv.memory = 1024
+      lv.cpus = 1
+    end
+
+    server.vm.provision "shell",
+      path: "scripts/server.sh",
+      env: {
+        "K3S_TOKEN" => k3s_token
+      }
+  end
+
+  config.vm.define "pmaimaitSW" do |worker|
+    worker.vm.hostname = "pmaimaitSW"
+
+    worker.vm.network "private_network",
+      ip: "192.168.56.111"
+
+    worker.vm.provider "libvirt" do |lv|
+      lv.memory = 1024
+      lv.cpus = 1
+    end
+
+    worker.vm.provision "shell",
+      path: "scripts/worker.sh",
+      env: {
+        "K3S_TOKEN" => k3s_token
+      }
+  end
+
+end
